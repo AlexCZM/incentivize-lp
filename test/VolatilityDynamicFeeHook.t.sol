@@ -41,8 +41,8 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         // creates the pool manager, utility routers, and test tokens
         deployFreshManagerAndRouters();
         deployMintAndApprove2Currencies();
-
-        deployAndApprovePosm(manager); // managers is declared in Fixtures-> Deployers
+        // manager is declared in Fixtures-> Deployers
+        deployAndApprovePosm(manager); 
 
         // Deploy the hook to an address with the correct flags
         address flags = address(
@@ -107,7 +107,7 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         assertEq(lpFeeBefore, lpFeeAfter, "LP fee changed; NOK");
     }
 
-    // LP fee is capped at maxFee when price changes by more than  50%
+    // Check that LP fee is capped at maxFee when price changes by more than 50%
     function test_highVolatility_maxFeeCapped() public {
         int256 amountSpecified = -250e18;
         bool zeroForOne = false;
@@ -125,7 +125,7 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         assertEq(lpFeeAfter, MAX_FEE + FIXED_FEE, "LP fee not capped");
     }
 
-    // Cross tick swap but deltaTick is smaller than 4055 ticks
+    //  Check that fixedFee < fee < maxFee when price moves across several ticks
     function test_crossTickSwap() public {
         int256 amountSpecified = -25e18;
         bool zeroForOne = false;
@@ -141,6 +141,7 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         (,,, uint24 lpFeeAfter) = manager.getSlot0(poolId);
         assertLt(tickAfter, tickBefore + 4055, "deltaTick must be smaller than 4055 ticks");
         assertGt(lpFeeAfter, FIXED_FEE, "LP fee not greater than FIXED_FEE");
+        assertLt(lpFeeAfter, MAX_FEE, "LP fee not greater than FIXED_FEE");
         console.log("lpFeeAfter", lpFeeAfter);
     }
 }

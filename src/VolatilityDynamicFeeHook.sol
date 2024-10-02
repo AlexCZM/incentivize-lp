@@ -26,6 +26,9 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
     uint24 constant MAX_FEE = 50_000; // 5%
     uint24 constant FIXED_FEE = 3_000; // 0.3%
     uint256 constant UPDATE_FEE_PERIOD = 24 hours;
+    // 1.0001 ^ 4055 ~= 1.5
+    // meaning that the price of one token increased by 50% against the other token
+    uint256 constant MAX_TICK_DELTA = 4055; 
     IPoolManager immutable manager;
 
     int24 public minTick;
@@ -74,9 +77,9 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
 
     function _getFee(int24 currentTick) internal pure returns (uint24 fee) {
         uint256 absTick = _getAbs(currentTick);
-        // ensure fee is not greater than MAX_FEE when tick moves by more than 4055 ticks
-        if (absTick >= 4055) return MAX_FEE;
-        fee = uint24(MAX_FEE * absTick / 4055);
+        // ensure fee is not greater than MAX_FEE when tick moves by more than MAX_TICK_DELTA ticks
+        if (absTick >= MAX_TICK_DELTA) return MAX_FEE;
+        fee = uint24(MAX_FEE * absTick / MAX_TICK_DELTA);
     }
 
     function _getAbs(int24 tick) internal pure returns (uint256 absTick) {
