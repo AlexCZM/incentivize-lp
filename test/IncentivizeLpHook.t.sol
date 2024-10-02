@@ -26,6 +26,10 @@ contract IncentivizeLpHookTest is Test, Fixtures {
     using CurrencyLibrary for Currency;
     using StateLibrary for IPoolManager;
 
+    // hook constants
+    uint24 constant MAX_FEE = 50_000; // 5%
+    uint24 constant FIXED_FEE = 3_000; // 0.3%
+
     IncentivizeLpHook hook;
     PoolId poolId;
 
@@ -53,11 +57,10 @@ contract IncentivizeLpHookTest is Test, Fixtures {
         poolId = key.toId();
         manager.initialize(key, SQRT_PRICE_1_1, ZERO_BYTES);
 
-        // Provide liquidity to [-10, 10] *tickSpacing interval around the current tick calculated from sqrtPriceX96
-        tickLower = TickMath.minUsableTick(key.tickSpacing); //-6930 - (10 * key.tickSpacing);//
-        tickUpper = TickMath.maxUsableTick(key.tickSpacing); //-6930 + (10 * key.tickSpacing);//
+        tickLower = -120;
+        tickUpper = 120;
 
-        uint128 liquidityAmount = 100e18;
+        uint128 liquidityAmount = 1_000e18;
 
         (uint256 amount0Expected, uint256 amount1Expected) = LiquidityAmounts.getAmountsForLiquidity(
             SQRT_PRICE_1_1,
@@ -77,35 +80,70 @@ contract IncentivizeLpHookTest is Test, Fixtures {
             block.timestamp,
             ZERO_BYTES
         );
+        // ensure pool has liquidity over a wider range of ticks
+        modifyLiquidityRouter.modifyLiquidity(
+            key, IPoolManager.ModifyLiquidityParams(-9_000, 9_000, 1_000e18, 0), ZERO_BYTES
+        );
     }
 
-    function test_setup() public view {
-        uint128 liquidity = manager.getLiquidity(poolId);
-        console.log("liquidity: ", liquidity);
-
-        (uint160 sqrtPriceX96, int24 currentTick, uint24 protocolFee, uint24 lpFee) = manager.getSlot0(poolId);
-        (uint128 liqGross, int128 liqNet) = manager.getTickLiquidity(poolId, tickLower);
-        console.log("liqGross: ", liqGross);
-        console.log("liquidityNet ...");
-        console.logInt(liqNet);
-        console.log("sqrtPriceX96: ", sqrtPriceX96);
-        console.log("currentTick ... ");
-        console.logInt(currentTick);
-        console.log("protocolFee: ", protocolFee);
-        console.log("lpFee: ", lpFee);
-    }
-
-    function testLiquidityHooks_1() public {
-        bool zeroForOne = true;
-        int256 amountSpecified = -1e18;
-
-        (,,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
+    // ensure that the same tick swap doesn't change the fee
+    function test_sameTickSwap_minFee() public {
+        // A negative amount means it is an exactInput swap, so the user is sending exactly that amount into the pool.
+        // A positive amount means it is an exactOutput swap, so the user is only requesting that amount out of the swap.
+        int256 amountSpecified = -10;
+        bool zeroForOne = false;
+        uint256 timestampBefore = block.timestamp;
+        (, int24 tickBefore,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
 
         swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        (, int24 tickAfter,,) = manager.getSlot0(poolId);
+
+        // lp fee is updated once every 24hours
+        vm.warp(block.timestamp + 25 hours);
+        // trigger any potential fee update
+        swap(key, zeroForOne, -1, ZERO_BYTES);
 
         (,,, uint24 lpFeeAfter) = manager.getSlot0(poolId);
+        assertEq(tickBefore, tickAfter, "Not same tick swap");
+        assertEq(lpFeeBefore, lpFeeAfter, "LP fee changed; NOK");
+    }
 
-        console.log("lpFeeBefore: ", lpFeeBefore);
-        console.log("lpFeeAfter: ", lpFeeAfter);
+    // LP fee is capped at maxFee when price changes by more than  50%
+    function test_highVolatility_maxFeeCapped() public {
+        int256 amountSpecified = -250e18;
+        bool zeroForOne = false;
+        uint256 timestampBefore = block.timestamp;
+        (, int24 tickBefore,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
+
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        (, int24 tickAfter,,) = manager.getSlot0(poolId);
+
+        // lp fee is updated once every 24hours
+        vm.warp(block.timestamp + 25 hours);
+        swap(key, zeroForOne, -10, ZERO_BYTES);
+
+        (,,, uint24 lpFeeAfter) = manager.getSlot0(poolId);
+        assertGt(tickAfter, tickBefore + 4055, "deltaTick must be bigger than 4055 ticks");
+        assertEq(lpFeeAfter, MAX_FEE + FIXED_FEE, "LP fee not capped");
+    }
+
+    // Cross tick swap but deltaTick is smaller than 4055 ticks
+    function test_crossTickSwap() public {
+        int256 amountSpecified = -25e18;
+        bool zeroForOne = false;
+        uint256 timestampBefore = block.timestamp;
+        (, int24 tickBefore,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
+
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        (, int24 tickAfter,,) = manager.getSlot0(poolId);
+
+        // lp fee is updated once every 24hours
+        vm.warp(block.timestamp + 25 hours);
+        swap(key, zeroForOne, -10, ZERO_BYTES);
+
+        (,,, uint24 lpFeeAfter) = manager.getSlot0(poolId);
+        assertLt(tickAfter, tickBefore + 4055, "deltaTick must be smaller than 4055 ticks");
+        assertGt(lpFeeAfter, FIXED_FEE, "LP fee not greater than FIXED_FEE");
+        console.log("lpFeeAfter", lpFeeAfter);
     }
 }

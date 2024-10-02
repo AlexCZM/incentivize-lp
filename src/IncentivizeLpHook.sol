@@ -24,7 +24,7 @@ contract IncentivizeLpHook is BaseTestHooks {
     using StateLibrary for IPoolManager;
 
     uint24 constant MAX_FEE = 50_000; // 5%
-    uint24 constant INITIAL_FEE = 3_000; // 0.3%
+    uint24 constant FIXED_FEE = 3_000; // 0.3%
     IPoolManager immutable manager;
 
     int24 public minTick;
@@ -46,9 +46,7 @@ contract IncentivizeLpHook is BaseTestHooks {
         returns (bytes4)
     {
         lastUpdateTimestamp = block.timestamp;
-        // minTick = TickMath.maxUsableTick(key.tickSpacing);
-        // maxTick = TickMath.minUsableTick(key.tickSpacing);
-        manager.updateDynamicLPFee(key, INITIAL_FEE);
+        manager.updateDynamicLPFee(key, FIXED_FEE);
         return IHooks.afterInitialize.selector;
     }
 
@@ -64,7 +62,7 @@ contract IncentivizeLpHook is BaseTestHooks {
 
         if (block.timestamp - lastUpdateTimestamp > 24 hours) {
             int24 deltaTick = maxTick - minTick;
-            manager.updateDynamicLPFee(key, INITIAL_FEE + _getFee(deltaTick));
+            manager.updateDynamicLPFee(key, FIXED_FEE + _getFee(deltaTick));
 
             minTick = 0;
             maxTick = 0;
@@ -74,9 +72,10 @@ contract IncentivizeLpHook is BaseTestHooks {
     }
 
     function _getFee(int24 currentTick) internal view returns (uint24 fee) {
-        // linear interpolation for a delta tick up to 4055 (corresponding to a 50% price change)
-        // todo: use safecast?
-        fee = uint24(MAX_FEE * _getAbs(currentTick) / 4055);
+        uint256 absTick = _getAbs(currentTick);
+        // ensure fee is not greater than MAX_FEE when tick moves by more than 4055 ticks
+        if (absTick >= 4055) return MAX_FEE;
+        fee = uint24(MAX_FEE * absTick / 4055);
     }
 
     function _getAbs(int24 tick) internal view returns (uint256 absTick) {
