@@ -17,19 +17,20 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 
-/// Simple hook that modify LP fee if liquidity is below or above a hardcoded threshold
-contract IncentivizeLpHook is BaseTestHooks {
+/// Dynamic fee hook driven by volatility over X period
+contract VolatilityDynamicFeeHook is BaseTestHooks {
     using Hooks for IHooks;
     using CurrencySettler for Currency;
     using StateLibrary for IPoolManager;
 
     uint24 constant MAX_FEE = 50_000; // 5%
     uint24 constant FIXED_FEE = 3_000; // 0.3%
+    uint256 constant UPDATE_FEE_PERIOD = 24 hours;
     IPoolManager immutable manager;
 
     int24 public minTick;
     int24 public maxTick;
-    uint256 public lastUpdateTimestamp;
+    uint40 public lastUpdateTimestamp;
 
     constructor(IPoolManager _manager) {
         manager = _manager;
@@ -45,7 +46,7 @@ contract IncentivizeLpHook is BaseTestHooks {
         override
         returns (bytes4)
     {
-        lastUpdateTimestamp = block.timestamp;
+        lastUpdateTimestamp = uint40(block.timestamp);
         manager.updateDynamicLPFee(key, FIXED_FEE);
         return IHooks.afterInitialize.selector;
     }
@@ -56,29 +57,29 @@ contract IncentivizeLpHook is BaseTestHooks {
         IPoolManager.SwapParams calldata, /* params**/
         bytes calldata /* hookData **/
     ) external override onlyPoolManager returns (bytes4, BeforeSwapDelta, uint24) {
-        (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee) = manager.getSlot0(key.toId());
+        (, int24 tick,,) = manager.getSlot0(key.toId());
         if (tick < minTick) minTick = tick;
         if (tick > maxTick) maxTick = tick;
 
-        if (block.timestamp - lastUpdateTimestamp > 24 hours) {
+        if (block.timestamp - lastUpdateTimestamp > UPDATE_FEE_PERIOD) {
             int24 deltaTick = maxTick - minTick;
             manager.updateDynamicLPFee(key, FIXED_FEE + _getFee(deltaTick));
 
             minTick = 0;
             maxTick = 0;
-            lastUpdateTimestamp = block.timestamp;
+            lastUpdateTimestamp = uint40(block.timestamp);
         }
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function _getFee(int24 currentTick) internal view returns (uint24 fee) {
+    function _getFee(int24 currentTick) internal pure returns (uint24 fee) {
         uint256 absTick = _getAbs(currentTick);
         // ensure fee is not greater than MAX_FEE when tick moves by more than 4055 ticks
         if (absTick >= 4055) return MAX_FEE;
         fee = uint24(MAX_FEE * absTick / 4055);
     }
 
-    function _getAbs(int24 tick) internal view returns (uint256 absTick) {
+    function _getAbs(int24 tick) internal pure returns (uint256 absTick) {
         // from v4-core/src/libraries/TickMath.getSqrtPriceAtTick()
         assembly ("memory-safe") {
             tick := signextend(2, tick)

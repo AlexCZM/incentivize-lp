@@ -12,7 +12,7 @@ import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {CurrencyLibrary, Currency} from "v4-core/src/types/Currency.sol";
 import {PoolSwapTest} from "v4-core/src/test/PoolSwapTest.sol";
-import {IncentivizeLpHook} from "../src/IncentivizeLpHook.sol";
+import {VolatilityDynamicFeeHook} from "../src/VolatilityDynamicFeeHook.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 
 import {LiquidityAmounts} from "v4-core/test/utils/LiquidityAmounts.sol";
@@ -20,7 +20,7 @@ import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol
 import {EasyPosm} from "./utils/EasyPosm.sol";
 import {Fixtures} from "./utils/Fixtures.sol";
 
-contract IncentivizeLpHookTest is Test, Fixtures {
+contract VolatilityDynamicFeeHookTest is Test, Fixtures {
     using EasyPosm for IPositionManager;
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
@@ -30,7 +30,7 @@ contract IncentivizeLpHookTest is Test, Fixtures {
     uint24 constant MAX_FEE = 50_000; // 5%
     uint24 constant FIXED_FEE = 3_000; // 0.3%
 
-    IncentivizeLpHook hook;
+    VolatilityDynamicFeeHook hook;
     PoolId poolId;
 
     uint256 tokenId;
@@ -49,8 +49,8 @@ contract IncentivizeLpHookTest is Test, Fixtures {
             uint160(Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_INITIALIZE_FLAG) ^ (0x4444 << 144) // Namespace the hook to avoid collisions
         );
         bytes memory constructorArgs = abi.encode(manager); //Add all the necessary constructor arguments from the hook
-        deployCodeTo("IncentivizeLpHook.sol:IncentivizeLpHook", constructorArgs, flags);
-        hook = IncentivizeLpHook(flags);
+        deployCodeTo("VolatilityDynamicFeeHook.sol:VolatilityDynamicFeeHook", constructorArgs, flags);
+        hook = VolatilityDynamicFeeHook(flags);
 
         // Create the pool
         key = PoolKey(currency0, currency1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 30, IHooks(hook)); // , , fee, tickSpacing, hooks
@@ -92,7 +92,6 @@ contract IncentivizeLpHookTest is Test, Fixtures {
         // A positive amount means it is an exactOutput swap, so the user is only requesting that amount out of the swap.
         int256 amountSpecified = -10;
         bool zeroForOne = false;
-        uint256 timestampBefore = block.timestamp;
         (, int24 tickBefore,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
 
         swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
@@ -112,8 +111,7 @@ contract IncentivizeLpHookTest is Test, Fixtures {
     function test_highVolatility_maxFeeCapped() public {
         int256 amountSpecified = -250e18;
         bool zeroForOne = false;
-        uint256 timestampBefore = block.timestamp;
-        (, int24 tickBefore,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
+        (, int24 tickBefore,,) = manager.getSlot0(poolId);
 
         swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
         (, int24 tickAfter,,) = manager.getSlot0(poolId);
@@ -131,8 +129,7 @@ contract IncentivizeLpHookTest is Test, Fixtures {
     function test_crossTickSwap() public {
         int256 amountSpecified = -25e18;
         bool zeroForOne = false;
-        uint256 timestampBefore = block.timestamp;
-        (, int24 tickBefore,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
+        (, int24 tickBefore,,) = manager.getSlot0(poolId);
 
         swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
         (, int24 tickAfter,,) = manager.getSlot0(poolId);
