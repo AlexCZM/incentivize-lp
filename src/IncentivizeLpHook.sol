@@ -23,17 +23,13 @@ contract IncentivizeLpHook is BaseTestHooks {
     using CurrencySettler for Currency;
     using StateLibrary for IPoolManager;
 
-    uint24 constant  MAX_FEE = 50_000; // 5%
-    uint24 constant  INITIAL_FEE = 3_000; // 0.3%
+    uint24 constant MAX_FEE = 50_000; // 5%
+    uint24 constant INITIAL_FEE = 3_000; // 0.3%
     IPoolManager immutable manager;
 
     int24 public minTick;
     int24 public maxTick;
     uint256 public lastUpdateTimestamp;
-
-
-
-    
 
     constructor(IPoolManager _manager) {
         manager = _manager;
@@ -48,7 +44,7 @@ contract IncentivizeLpHook is BaseTestHooks {
         external
         override
         returns (bytes4)
-    {   
+    {
         lastUpdateTimestamp = block.timestamp;
         // minTick = TickMath.maxUsableTick(key.tickSpacing);
         // maxTick = TickMath.minUsableTick(key.tickSpacing);
@@ -66,14 +62,13 @@ contract IncentivizeLpHook is BaseTestHooks {
         if (tick < minTick) minTick = tick;
         if (tick > maxTick) maxTick = tick;
 
-        if (lastUpdateTimestamp - block.timestamp > 24 hours) {
+        if (block.timestamp - lastUpdateTimestamp > 24 hours) {
             int24 deltaTick = maxTick - minTick;
             manager.updateDynamicLPFee(key, INITIAL_FEE + _getFee(deltaTick));
 
             minTick = 0;
             maxTick = 0;
             lastUpdateTimestamp = block.timestamp;
-           
         }
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }

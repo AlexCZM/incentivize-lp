@@ -32,13 +32,13 @@ contract IncentivizeLpHookTest is Test, Fixtures {
     uint256 tokenId;
     int24 tickLower;
     int24 tickUpper;
- 
+
     function setUp() public {
         // creates the pool manager, utility routers, and test tokens
         deployFreshManagerAndRouters();
         deployMintAndApprove2Currencies();
 
-        deployAndApprovePosm(manager);// managers is declared in Fixtures-> Deployers
+        deployAndApprovePosm(manager); // managers is declared in Fixtures-> Deployers
 
         // Deploy the hook to an address with the correct flags
         address flags = address(
@@ -49,13 +49,13 @@ contract IncentivizeLpHookTest is Test, Fixtures {
         hook = IncentivizeLpHook(flags);
 
         // Create the pool
-        key = PoolKey(currency0, currency1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 30, IHooks(hook));// , , fee, tickSpacing, hooks
+        key = PoolKey(currency0, currency1, LPFeeLibrary.DYNAMIC_FEE_FLAG, 30, IHooks(hook)); // , , fee, tickSpacing, hooks
         poolId = key.toId();
         manager.initialize(key, SQRT_PRICE_1_1, ZERO_BYTES);
 
-        // Provide liquidity to [-10, 10] *tickSpacing interval around the current tick calculated from sqrtPriceX96 
-        tickLower = TickMath.minUsableTick(key.tickSpacing);//-6930 - (10 * key.tickSpacing);// 
-        tickUpper = TickMath.maxUsableTick(key.tickSpacing);//-6930 + (10 * key.tickSpacing);//
+        // Provide liquidity to [-10, 10] *tickSpacing interval around the current tick calculated from sqrtPriceX96
+        tickLower = TickMath.minUsableTick(key.tickSpacing); //-6930 - (10 * key.tickSpacing);//
+        tickUpper = TickMath.maxUsableTick(key.tickSpacing); //-6930 + (10 * key.tickSpacing);//
 
         uint128 liquidityAmount = 100e18;
 
@@ -80,7 +80,6 @@ contract IncentivizeLpHookTest is Test, Fixtures {
     }
 
     function test_setup() public view {
-
         uint128 liquidity = manager.getLiquidity(poolId);
         console.log("liquidity: ", liquidity);
 
@@ -94,14 +93,13 @@ contract IncentivizeLpHookTest is Test, Fixtures {
         console.logInt(currentTick);
         console.log("protocolFee: ", protocolFee);
         console.log("lpFee: ", lpFee);
-
     }
 
     function testLiquidityHooks_1() public {
         bool zeroForOne = true;
         int256 amountSpecified = -1e18;
 
-        (,,,uint24 lpFeeBefore) = manager.getSlot0(poolId);
+        (,,, uint24 lpFeeBefore) = manager.getSlot0(poolId);
 
         swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
 
