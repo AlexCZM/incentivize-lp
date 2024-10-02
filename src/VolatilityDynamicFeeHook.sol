@@ -32,6 +32,8 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
     int24 public maxTick;
     uint40 public lastUpdateTimestamp;
 
+    event FeeUpdated(uint24 indexed newDynamicLPFee);
+
     constructor(IPoolManager _manager) {
         manager = _manager;
     }
@@ -63,7 +65,9 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
 
         if (block.timestamp - lastUpdateTimestamp > UPDATE_FEE_PERIOD) {
             int24 deltaTick = maxTick - minTick;
-            manager.updateDynamicLPFee(key, FIXED_FEE + _getFee(deltaTick));
+            uint24 newDynamicLPFee = FIXED_FEE + _getFee(deltaTick);
+            manager.updateDynamicLPFee(key, newDynamicLPFee);
+            emit FeeUpdated(newDynamicLPFee);
 
             minTick = 0;
             maxTick = 0;

@@ -143,4 +143,18 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         assertGt(lpFeeAfter, FIXED_FEE, "LP fee not greater than FIXED_FEE");
         console.log("lpFeeAfter", lpFeeAfter);
     }
+
+    function test_emitEvent() public {
+        int256 amountSpecified = -25e18;
+        bool zeroForOne = false;
+
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+        vm.expectEmit(true, true, false, false);
+        emit VolatilityDynamicFeeHook.FeeUpdated(7611);
+
+        // lp fee is updated once every 24hours
+        vm.warp(block.timestamp + 25 hours);
+        swap(key, zeroForOne, -10, ZERO_BYTES);
+    }
 }
