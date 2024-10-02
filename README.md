@@ -43,7 +43,7 @@ Higher fees during volatile periods can help reduce excessive speculation and pr
 
 ```
 forge install
-forge test
+forge test --mc VolatilityDynamicFeeHookTest
 ```
 
 
