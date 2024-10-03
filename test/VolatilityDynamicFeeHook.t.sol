@@ -38,9 +38,7 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
     int24 tickLower;
     int24 tickUpper;
 
-    Vm public constant vm = Vm(VM_ADDRESS);   
-
-
+ 
     function setUp() public {
         // creates the pool manager, utility routers, and test tokens
         deployFreshManagerAndRouters();
@@ -161,29 +159,15 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         // lp fee is updated once every 24hours
         vm.warp(block.timestamp + 25 hours);
         swap(key, zeroForOne, -10, ZERO_BYTES);
-    }
-
-    // function test_emitEventTickUpdated() public {
-    //     int256 amountSpecified = -25e18;
-    //     bool zeroForOne = false;
-
-    //     swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
-
-    //     vm.expectEmit(true, true, false, false);
-    //     // emit VolatilityDynamicFeeHook.TickUpdated(5000, 10000);
-
-    //     swap(key, zeroForOne, -10, ZERO_BYTES);
-    //     // emit VolatilityDynamicFeeHook.TickUpdated(5000, 10000);
-
-    // }
-
-    function testChangeHookSettings() public {
+    } 
+    
+    function test_changeHookSettings() public {
          uint24 newMaxFee = 60_000; // 6%
         uint24 newFixedFee = 2_000; // 0.2%
         uint256 newUpdateFeePeriod = 48 hours; // 2 days
         uint256 newMaxTickDelta = 5050; // Custom tick delta
 
-         vm.prank(manager); // Simulate a call from the PoolManager
+        vm.prank(address(manager)); // Simulate a call from the PoolManager
         hook.changeHookSettings(newMaxFee, newFixedFee, newUpdateFeePeriod, newMaxTickDelta);
 
         // Assert
@@ -193,7 +177,7 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         assertEq(hook.maxTickDelta(), newMaxTickDelta, "Max tick delta should be updated");
     }
 
-    function testOnlyPoolManagerCanChangeSettings() public {
+    function test_onlyPoolManagerCanChangeSettings() public {
         // Try to call the function from a different address
         uint24 newMaxFee = 60_000;
         uint24 newFixedFee = 2_000;
