@@ -19,6 +19,7 @@ import {LiquidityAmounts} from "v4-core/test/utils/LiquidityAmounts.sol";
 import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
 import {EasyPosm} from "./utils/EasyPosm.sol";
 import {Fixtures} from "./utils/Fixtures.sol";
+import "forge-std/Test.sol";
 
 contract VolatilityDynamicFeeHookTest is Test, Fixtures {
     using EasyPosm for IPositionManager;
@@ -36,6 +37,9 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
     uint256 tokenId;
     int24 tickLower;
     int24 tickUpper;
+
+    Vm public constant vm = Vm(VM_ADDRESS);   
+
 
     function setUp() public {
         // creates the pool manager, utility routers, and test tokens
@@ -158,4 +162,47 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         vm.warp(block.timestamp + 25 hours);
         swap(key, zeroForOne, -10, ZERO_BYTES);
     }
+
+    // function test_emitEventTickUpdated() public {
+    //     int256 amountSpecified = -25e18;
+    //     bool zeroForOne = false;
+
+    //     swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+    //     vm.expectEmit(true, true, false, false);
+    //     // emit VolatilityDynamicFeeHook.TickUpdated(5000, 10000);
+
+    //     swap(key, zeroForOne, -10, ZERO_BYTES);
+    //     // emit VolatilityDynamicFeeHook.TickUpdated(5000, 10000);
+
+    // }
+
+    function testChangeHookSettings() public {
+         uint24 newMaxFee = 60_000; // 6%
+        uint24 newFixedFee = 2_000; // 0.2%
+        uint256 newUpdateFeePeriod = 48 hours; // 2 days
+        uint256 newMaxTickDelta = 5050; // Custom tick delta
+
+         vm.prank(manager); // Simulate a call from the PoolManager
+        hook.changeHookSettings(newMaxFee, newFixedFee, newUpdateFeePeriod, newMaxTickDelta);
+
+        // Assert
+        assertEq(hook.maxFee(), newMaxFee, "Max fee should be updated");
+        assertEq(hook.fixedFee(), newFixedFee, "Fixed fee should be updated");
+        assertEq(hook.updateFeePeriod(), newUpdateFeePeriod, "Update fee period should be updated");
+        assertEq(hook.maxTickDelta(), newMaxTickDelta, "Max tick delta should be updated");
+    }
+
+    function testOnlyPoolManagerCanChangeSettings() public {
+        // Try to call the function from a different address
+        uint24 newMaxFee = 60_000;
+        uint24 newFixedFee = 2_000;
+        uint256 newUpdateFeePeriod = 48 hours;
+        uint256 newMaxTickDelta = 5050;
+
+        
+        vm.expectRevert();
+        hook.changeHookSettings(newMaxFee, newFixedFee, newUpdateFeePeriod, newMaxTickDelta);
+    }
+
 }

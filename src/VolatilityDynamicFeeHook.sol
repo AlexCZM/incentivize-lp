@@ -22,13 +22,15 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
     using Hooks for IHooks;
     using CurrencySettler for Currency;
     using StateLibrary for IPoolManager;
+ 
 
-    uint24 constant MAX_FEE = 50_000; // 5%
-    uint24 constant FIXED_FEE = 3_000; // 0.3%
-    uint256 constant UPDATE_FEE_PERIOD = 24 hours;
-    // 1.0001 ^ 4055 ~= 1.5
+ 
+    uint24 public maxFee = 50_000; // 5%
+    uint24 public fixedFee = 3_000; // 0.3%
+    uint256 public updateFeePeriod = 24 hours;
     // meaning that the price of one token increased by 50% against the other token
-    uint256 constant MAX_TICK_DELTA = 4055; 
+    uint256 public maxTickDelta = 4055; // 1.0001 ^ 4055 ~= 1.5
+ 
     IPoolManager immutable manager;
 
     int24 public minTick;
@@ -36,6 +38,7 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
     uint40 public lastUpdateTimestamp;
 
     event FeeUpdated(uint24 indexed newDynamicLPFee);
+    event TickUpdated(int24 indexed minTick, int24 indexed maxTick);
 
     constructor(IPoolManager _manager) {
         manager = _manager;
@@ -52,7 +55,7 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
         returns (bytes4)
     {
         lastUpdateTimestamp = uint40(block.timestamp);
-        manager.updateDynamicLPFee(key, FIXED_FEE);
+        manager.updateDynamicLPFee(key, fixedFee);
         return IHooks.afterInitialize.selector;
     }
 
@@ -63,12 +66,12 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
         bytes calldata /* hookData **/
     ) external override onlyPoolManager returns (bytes4, BeforeSwapDelta, uint24) {
         (, int24 tick,,) = manager.getSlot0(key.toId());
-        if (tick < minTick) minTick = tick;
-        if (tick > maxTick) maxTick = tick;
-
-        if (block.timestamp - lastUpdateTimestamp > UPDATE_FEE_PERIOD) {
+        if (tick < minTick) {minTick = tick; emit TickUpdated(minTick, maxTick);}
+        if (tick > maxTick) {maxTick = tick; emit TickUpdated(minTick, maxTick);}
+        
+        if (block.timestamp - lastUpdateTimestamp > updateFeePeriod) {
             int24 deltaTick = maxTick - minTick;
-            uint24 newDynamicLPFee = FIXED_FEE + _getFee(deltaTick);
+            uint24 newDynamicLPFee = fixedFee + _getFee(deltaTick);
             manager.updateDynamicLPFee(key, newDynamicLPFee);
             emit FeeUpdated(newDynamicLPFee);
 
@@ -79,11 +82,11 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function _getFee(int24 currentTick) internal pure returns (uint24 fee) {
+    function _getFee(int24 currentTick) internal view returns (uint24 fee) {
         uint256 absTick = _getAbs(currentTick);
-        // ensure fee is not greater than MAX_FEE when tick moves by more than MAX_TICK_DELTA ticks
-        if (absTick >= MAX_TICK_DELTA) return MAX_FEE;
-        fee = uint24(MAX_FEE * absTick / MAX_TICK_DELTA);
+        // ensure fee is not greater than maxFee when tick moves by more than maxTickDelta ticks
+        if (absTick >= maxTickDelta) return maxFee;
+        fee = uint24(maxFee * absTick / maxTickDelta);
     }
 
     function _getAbs(int24 tick) internal pure returns (uint256 absTick) {
@@ -97,5 +100,12 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
             // either way, |tick| = mask ^ (tick + mask)
             absTick := xor(mask, add(mask, tick))
         }
+    }
+
+    function changeHookSettings(uint24 _maxFee, uint24 _fixedFee, uint256 _updateFeePeriod, uint256 _maxTickDelta) external onlyPoolManager {
+        maxFee = _maxFee;
+        fixedFee = _fixedFee;
+        updateFeePeriod = _updateFeePeriod;
+        maxTickDelta = _maxTickDelta;
     }
 }
