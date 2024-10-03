@@ -1,6 +1,7 @@
 # VolatilityDynamicFeeHook
+Final project developed for Advanced Solidity Bootcamp with [Encode](https://www.encode.club/)
 
-## Overview
+## Project Overview
 VolatilityDynamicFeeHook is a smart contract designed to work with Uniswap v4 as a hook. It implements a dynamic fee mechanism that adjusts based on the price volatility of the pool. This contract aims to optimize liquidity provision and trading by adapting fees to market conditions.
 
 ## How It Works
@@ -58,3 +59,29 @@ Additional resources:
 
 [v4-by-example](https://v4-by-example.org)
 
+--------------------------------------------------------------------
+
+## Intro (final project context)
+
+### What
+A hook  that adjusts the lp fee (swap fee) based on the volatility of the pool tokens.
+
+### Why
+To familiarize with the uniV4 and how hooks works.
+
+### V4 vs V3
+  *A non comprehensive overview*
+
+V4 is using the concentrated liquidity (same as V3) but: 
+- Singleton Design
+- Flash Accounting: 
+    - useful when interacting with multiple pools. (eg. ETH/USDT -> USDT/DAI)
+    - tokens transfer are performed at the end
+- Native Ether 
+- Dynamic Fees 
+- Hooks (new to V4)
+
+### V4 hooks: 
+- uniswap hooks are smart contracts that can be attached (in initialization phase) to liquidity pools
+- inject your own logic to extend the behavior of liquidity pools
+- hooks can be called at 4 different actions:  (`initialize`, `add`/`remove liquidity`, `swap`, `donate`) x (`before`, `after`) + 2 special cases (NoOp hooks)

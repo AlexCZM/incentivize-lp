@@ -79,8 +79,8 @@ contract VolatilityDynamicFeeHook is BaseTestHooks {
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function _getFee(int24 currentTick) internal pure returns (uint24 fee) {
-        uint256 absTick = _getAbs(currentTick);
+    function _getFee(int24 tickDelta) internal pure returns (uint24 fee) {
+        uint256 absTick = _getAbs(tickDelta);
         // ensure fee is not greater than MAX_FEE when tick moves by more than MAX_TICK_DELTA ticks
         if (absTick >= MAX_TICK_DELTA) return MAX_FEE;
         fee = uint24(MAX_FEE * absTick / MAX_TICK_DELTA);

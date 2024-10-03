@@ -105,13 +105,15 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         (,,, uint24 lpFeeAfter) = manager.getSlot0(poolId);
         assertEq(tickBefore, tickAfter, "Not same tick swap");
         assertEq(lpFeeBefore, lpFeeAfter, "LP fee changed; NOK");
+        console.log("lp fee before: ", lpFeeBefore);
+        console.log("lp fee after: ", lpFeeAfter);
     }
 
     // Check that LP fee is capped at maxFee when price changes by more than 50%
     function test_highVolatility_maxFeeCapped() public {
         int256 amountSpecified = -250e18;
         bool zeroForOne = false;
-        (, int24 tickBefore,,) = manager.getSlot0(poolId);
+        (, int24 tickBefore,,uint24 lpFeeBefore) = manager.getSlot0(poolId);
 
         swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
         (, int24 tickAfter,,) = manager.getSlot0(poolId);
@@ -123,13 +125,16 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         (,,, uint24 lpFeeAfter) = manager.getSlot0(poolId);
         assertGt(tickAfter, tickBefore + 4055, "deltaTick must be bigger than 4055 ticks");
         assertEq(lpFeeAfter, MAX_FEE + FIXED_FEE, "LP fee not capped");
+
+        console.log("lp fee before: ", lpFeeBefore);
+        console.log("lp fee after: ", lpFeeAfter);
     }
 
     //  Check that fixedFee < fee < maxFee when price moves across several ticks
     function test_crossTickSwap() public {
         int256 amountSpecified = -25e18;
         bool zeroForOne = false;
-        (, int24 tickBefore,,) = manager.getSlot0(poolId);
+        (, int24 tickBefore,,uint24 lpFeeBefore) = manager.getSlot0(poolId);
 
         swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
         (, int24 tickAfter,,) = manager.getSlot0(poolId);
@@ -142,7 +147,8 @@ contract VolatilityDynamicFeeHookTest is Test, Fixtures {
         assertLt(tickAfter, tickBefore + 4055, "deltaTick must be smaller than 4055 ticks");
         assertGt(lpFeeAfter, FIXED_FEE, "LP fee not greater than FIXED_FEE");
         assertLt(lpFeeAfter, MAX_FEE, "LP fee not greater than FIXED_FEE");
-        console.log("lpFeeAfter", lpFeeAfter);
+        console.log("lp fee before: ", lpFeeBefore);
+        console.log("lp fee after: ", lpFeeAfter);
     }
 
     function test_emitEvent() public {
